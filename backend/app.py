@@ -1,23 +1,31 @@
-from flask import Flask, request, jsonify
+ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import json
 import os
 import time
-from google import genai
+import google.generativeai as genai
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+# =========================
 # MULTIPLE API KEYS
+# =========================
 API_KEYS = [
     os.getenv("GEMINI_API_KEY_1"),
     os.getenv("GEMINI_API_KEY_2"),
     os.getenv("GEMINI_API_KEY_3")
 ]
 
+API_KEYS = [key for key in API_KEYS if key]
+
+
+# =========================
+# YOUR ORIGINAL PROMPT
+# =========================
 PROMPT = """You are a smart study assistant for students.
 Analyse this handwritten notes image carefully.
 Return ONLY a valid JSON object with exactly these 7 keys:
@@ -45,19 +53,22 @@ Return ONLY a valid JSON object with exactly these 7 keys:
 }
 
 IMPORTANT: Return ONLY valid JSON.
+Do NOT include ```json or any extra text.
 """
 
 
+# =========================
+# GEMINI CALL (FIXED)
+# =========================
 def call_gemini_with_retry(contents, retries=5):
     for attempt in range(retries):
         for key in API_KEYS:
             try:
-                client = genai.Client(api_key=key)
+                genai.configure(api_key=key)
 
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=contents
-                )
+                model = genai.GenerativeModel("gemini-1.5-flash")
+
+                response = model.generate_content(contents)
 
                 if response and response.text:
                     return response
@@ -70,6 +81,9 @@ def call_gemini_with_retry(contents, retries=5):
     return None
 
 
+# =========================
+# ROUTES
+# =========================
 @app.route("/")
 def home():
     return "ScribbleSense AI backend is running!"
@@ -87,19 +101,10 @@ def analyse():
         image_data = file.read()
 
         contents = [
+            f"{PROMPT}\nReturn ALL output in {language} language.",
             {
-                "role": "user",
-                "parts": [
-                    {
-                        "text": f"{PROMPT}\nReturn ALL output in {language} language."
-                    },
-                    {
-                        "inline_data": {
-                            "mime_type": file.content_type,
-                            "data": image_data
-                        }
-                    }
-                ]
+                "mime_type": file.content_type,
+                "data": image_data
             }
         ]
 
@@ -110,6 +115,7 @@ def analyse():
 
         response_text = response.text.strip()
 
+        # remove ```json if present
         if response_text.startswith("```"):
             lines = response_text.split("\n")
             lines = [l for l in lines if not l.startswith("```")]
@@ -152,6 +158,9 @@ def ask():
         return jsonify({"error": str(e)})
 
 
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port) 
+    app.run(host="0.0.0.0", port=port)
