@@ -10,7 +10,7 @@
 
 // Your backend URL — while testing locally use this
 // When you deploy to Render, replace with your Render URL
-const BACKEND_URL = "http://127.0.0.1:5000/analyse";
+const BACKEND_URL = "http://127.0.0.1:10000/analyse";
 
 // ============================================================
 // MAIN FUNCTION — runs when user clicks "Analyse Notes"
@@ -40,8 +40,7 @@ async function analysePhoto() {
  formData.append("image", file);
 
   // get selected language
-  const language = document.getElementById("language-select").value;
-
+ const language = document.getElementById("language-select").value;
   // send to backend
  formData.append("language", language);
   
