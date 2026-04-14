@@ -66,8 +66,25 @@
             Change photo
           </button>
         </div>
+        <!-- multi language feature -->
+         <div style="margin-top:10px;">
+        <label class="language-label">Select Output Language:</label>
+       <select id="language-select"
+        class="language-select">
+       <option value="English">English</option>
+       <option value="Hindi">Hindi</option>
+        <option value="Bengali">Bengali</option>
+        <option value="Telegu">Telegu</option>
+        <option value="Tamil">Tamil</option>
+        <option value="Marathi">Marathi</option>
+       </select>
+      </div>
 
         <!-- Analyse button -->
+         <button onclick="restoreHistory()" class="new-btn">
+            Restore Last Notes
+         </button>
+         <div id="history-box"></div>
         <button class="analyse-btn" id="analyse-btn" onclick="analysePhoto()">
           Analyse my notes
         </button>
@@ -143,6 +160,13 @@
 
         <!-- Card 4: Key Terms -->
         <div class="result-card card-terms">
+         <div class="result-card card-flashcards">
+            <div class="card-header">
+            <div class="card-icon icon-purple">🧠</div>
+             <h2 class="card-title">Flashcards</h2>
+         </div>
+          <div class="card-body" id="flashcards-output"></div>
+          </div>
           <div class="card-header">
             <div class="card-icon icon-blue">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -157,6 +181,29 @@
 
       </div>
       <!-- end results grid -->
+
+       <!-- ASK FROM NOTES CARD -->
+     <div class="result-card">
+      <div class="card-header">
+       <div class="card-icon icon-purple">💬</div>
+       <h2 class="card-title">Ask From Notes</h2>
+     </div>
+
+   <div class="card-body">
+    <div id="chat-output"></div>
+
+    <input 
+      type="text" 
+      id="chat-input"
+      placeholder="Ask something from your notes..."
+      style="width:100%; padding:10px; margin-top:10px;"
+    />
+
+    <button onclick="askNotes()" class="analyse-btn" style="margin-top:8px">
+      Ask
+      </button>
+    </div>
+    </div>
 
       <!-- Study Tip — Unique Feature 3 -->
       <div class="studytip-card">

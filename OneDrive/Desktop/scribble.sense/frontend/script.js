@@ -37,7 +37,14 @@ async function analysePhoto() {
 
   // Step 4: Package the photo into FormData (like a form submission)
   const formData = new FormData();
-  formData.append("image", file);
+ formData.append("image", file);
+
+  // get selected language
+  const language = document.getElementById("language-select").value;
+
+  // send to backend
+ formData.append("language", language);
+  
   // "image" must match what app.py reads: request.files['image']
 
   try {
@@ -64,6 +71,7 @@ async function analysePhoto() {
     showLoading(false);
     displayAllResults(data);
 
+
   } catch (err) {
     // If anything went wrong, show a friendly error message
     showLoading(false);
@@ -75,25 +83,26 @@ async function analysePhoto() {
 // ============================================================
 // DISPLAY FUNCTIONS — each one fills in one section
 // ============================================================
-
 function displayAllResults(data) {
-  // Show the results section (it was hidden before)
+  saveToHistory(data);
   document.getElementById("results-section").style.display = "block";
 
-  // Fill in all 5 sections one by one
   displaySubjectBadge(data.subject, data.confidence);
   displayNotes(data.structured_notes);
   displaySummary(data.summary);
   displayQuiz(data.quiz);
+
+  // FLASHCARDS
+  displayFlashcards(data.key_terms);
+
   displayKeyTerms(data.key_terms);
   displayStudyTip(data.study_tip);
 
-  // Smoothly scroll down to show results
   document.getElementById("results-section").scrollIntoView({
     behavior: "smooth"
   });
 }
-
+ 
 
 // ---- UNIQUE FEATURE 1: Subject badge + confidence ring ----
 function displaySubjectBadge(subject, confidence) {
@@ -475,4 +484,101 @@ function showPhotoPreview(file) {
     document.getElementById("drop-zone").style.display    = "none";
   };
   reader.readAsDataURL(file);
+}
+// ================= FLASHCARDS =================
+ function displayFlashcards(terms) {
+  const container = document.getElementById("flashcards-output");
+
+  const html = terms.map(item => `
+    <div class="flashcard" onclick="toggleFlashcard(this)">
+      
+      <div class="flashcard-term">
+        ⭐ ${item.term}
+      </div>
+
+      <div class="flashcard-def">
+        ${item.definition}
+      </div>
+
+    </div>
+  `).join("");
+
+  container.innerHTML = html;
+}
+
+function toggleFlashcard(card) {
+  const def = card.querySelector(".flashcard-def");
+  def.style.display =
+    def.style.display === "block" ? "none" : "block";
+}
+//ask question from the notes
+async function askNotes() {
+  const question = document.getElementById("chat-input").value;
+
+  const response = await fetch("http://127.0.0.1:5000/ask", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ question })
+  });
+
+  const data = await response.json();
+
+  const chat = document.getElementById("chat-output");
+
+  chat.innerHTML += `
+    <div><strong>You:</strong> ${question}</div>
+    <div><strong>AI:</strong> ${data.answer}</div>
+    <hr>
+  `;
+}
+//history restore
+  function saveToHistory(data) {
+  let history = JSON.parse(localStorage.getItem("scribble_history")) || [];
+
+  const copy = JSON.parse(JSON.stringify(data));
+
+  let title = "Notes";
+
+  if (data.structured_notes) {
+    const firstLine = data.structured_notes.split("\n")[0];
+    title = firstLine.replace("#", "").trim();
+  }
+
+  copy._meta = {
+    title: title,
+    time: new Date().toLocaleTimeString()
+  };
+
+  history.unshift(copy);
+
+  localStorage.setItem(
+    "scribble_history",
+    JSON.stringify(history.slice(0, 5))
+  );
+}
+//restore history//
+ function restoreHistory() {
+  const history = JSON.parse(localStorage.getItem("scribble_history")) || [];
+
+  let html = "";
+
+  history.forEach((item, index) => {
+    html += `
+      <div class="history-item" onclick="loadHistory(${index})">
+        <strong>${item._meta?.title || "Notes"}</strong>
+        <br>
+        <small>${item._meta?.time || ""}</small>
+      </div>
+    `;
+  });
+
+  document.getElementById("history-box").innerHTML = html;
+}
+
+// load history//
+function loadHistory(index) {
+  const history = JSON.parse(localStorage.getItem("scribble_history")) || [];
+  displayAllResults(history[index]);
 }
