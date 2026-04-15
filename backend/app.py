@@ -3,8 +3,9 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import json
 import os
+import base64
 import time
-import google.generativeai as genai
+from groq import Groq
 
 load_dotenv()
 
@@ -12,15 +13,14 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # =========================
-# MULTIPLE API KEYS
+# GROQ CLIENT
 # =========================
-API_KEYS = [
-    os.getenv("GEMINI_API_KEY_1"),
-    os.getenv("GEMINI_API_KEY_2"),
-    os.getenv("GEMINI_API_KEY_3")
-]
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-API_KEYS = [key for key in API_KEYS if key]
+# Vision model with image support
+VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+# Text-only model for /ask endpoint
+TEXT_MODEL = "llama3-70b-8192"
 
 
 # =========================
@@ -58,25 +58,63 @@ Do NOT include ```json or any extra text.
 
 
 # =========================
-# GEMINI CALL (FIXED)
+# GROQ VISION CALL
 # =========================
-def call_gemini_with_retry(contents, retries=5):
+def call_groq_vision(image_data: bytes, mime_type: str, language: str, retries: int = 3):
+    """Send an image to Groq vision model and return the raw text response."""
+    # Encode image as base64 data URL
+    b64_image = base64.b64encode(image_data).decode("utf-8")
+    image_url = f"data:{mime_type};base64,{b64_image}"
+
     for attempt in range(retries):
-        for key in API_KEYS:
-            try:
-                genai.configure(api_key=key)
+        try:
+            response = client.chat.completions.create(
+                model=VISION_MODEL,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"{PROMPT}\nReturn ALL output in {language} language."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": image_url}
+                            }
+                        ]
+                    }
+                ],
+                temperature=0.2,
+                max_tokens=2048,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Groq vision attempt {attempt + 1} failed: {e}")
+            if attempt < retries - 1:
+                time.sleep(2)
 
-                model = genai.GenerativeModel("gemini-1.5-flash")
+    return None
 
-                response = model.generate_content(contents)
 
-                if response and response.text:
-                    return response
-
-            except Exception as e:
-                print(f"Retry {attempt+1} Key failed:", e)
-
-        time.sleep(2)
+# =========================
+# GROQ TEXT CALL
+# =========================
+def call_groq_text(prompt: str, retries: int = 3):
+    """Send a plain text prompt to Groq and return the response."""
+    for attempt in range(retries):
+        try:
+            response = client.chat.completions.create(
+                model=TEXT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.5,
+                max_tokens=1024,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Groq text attempt {attempt + 1} failed: {e}")
+            if attempt < retries - 1:
+                time.sleep(2)
 
     return None
 
@@ -86,7 +124,7 @@ def call_gemini_with_retry(contents, retries=5):
 # =========================
 @app.route("/")
 def home():
-    return "ScribbleSense AI backend is running!"
+    return "ScribbleSense AI backend is running! (Powered by Groq + Llama 4 Scout)"
 
 
 @app.route("/analyse", methods=["POST"])
@@ -100,22 +138,14 @@ def analyse():
 
         image_data = file.read()
 
-        contents = [
-            f"{PROMPT}\nReturn ALL output in {language} language.",
-            {
-                "mime_type": file.content_type,
-                "data": image_data
-            }
-        ]
+        response_text = call_groq_vision(image_data, file.content_type, language)
 
-        response = call_gemini_with_retry(contents)
+        if response_text is None:
+            return jsonify({"error": "AI busy, please try again"}), 500
 
-        if response is None:
-            return jsonify({"error": "AI busy, try again"}), 500
+        response_text = response_text.strip()
 
-        response_text = response.text.strip()
-
-        # remove ```json if present
+        # Strip ```json fences if present
         if response_text.startswith("```"):
             lines = response_text.split("\n")
             lines = [l for l in lines if not l.startswith("```")]
@@ -124,8 +154,7 @@ def analyse():
         try:
             result = json.loads(response_text)
             return jsonify(result)
-
-        except:
+        except Exception:
             print("RAW RESPONSE:\n", response_text)
             return jsonify({
                 "error": "AI returned invalid JSON",
@@ -141,18 +170,16 @@ def analyse():
 def ask():
     try:
         data = request.json
-        question = data.get("question")
+        question = data.get("question", "")
 
-        contents = f"Answer from student's notes: {question}"
+        prompt = f"You are a helpful study assistant. Answer this question from a student's notes: {question}"
 
-        response = call_gemini_with_retry(contents)
+        answer = call_groq_text(prompt)
 
-        if response is None:
-            return jsonify({"answer": "AI busy, try again"})
+        if answer is None:
+            return jsonify({"answer": "AI busy, please try again"})
 
-        return jsonify({
-            "answer": response.text
-        })
+        return jsonify({"answer": answer})
 
     except Exception as e:
         return jsonify({"error": str(e)})
