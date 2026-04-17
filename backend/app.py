@@ -20,7 +20,7 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # Vision model with image support
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 # Text-only model for /ask endpoint
-TEXT_MODEL = "llama3-70b-8192"
+TEXT_MODEL = "llama-3.3-70b-versatile"
 
 
 # =========================
