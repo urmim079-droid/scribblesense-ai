@@ -10,7 +10,7 @@
 
 // Your backend URL — while testing locally use this
 // When you deploy to Render, replace with your Render URL
-const BACKEND_URL = "http://127.0.0.1:10000/analyse";
+const BACKEND_URL = "https://backend-k52g.onrender.com/analyse";
 
 // ============================================================
 // MAIN FUNCTION — runs when user clicks "Analyse Notes"
@@ -415,7 +415,7 @@ function showError(message) {
   const box = document.getElementById("error-box");
   box.style.display = "block";
   box.textContent = "Something went wrong: " + message +
-    ". Make sure your Python backend is running (python app.py).";
+    ". Server is not responding. Please try again later.";
 }
 
 // Allow drag and drop on the upload area
@@ -514,7 +514,7 @@ function toggleFlashcard(card) {
 async function askNotes() {
   const question = document.getElementById("chat-input").value;
 
-  const response = await fetch("http://127.0.0.1:5000/ask", {
+  const response = await fetch("https://backend-k52g.onrender.com/ask", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
