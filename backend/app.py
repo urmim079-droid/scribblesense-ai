@@ -15,7 +15,12 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 # =========================
 # GROQ CLIENT
 # =========================
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# NEW - validates key exists at startup
+api_key = os.getenv("GROQ_API_KEY")
+if not api_key:
+    raise ValueError("GROQ_API_KEY environment variable is not set!")
+client = Groq(api_key=api_key)
 
 # Vision model with image support
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
@@ -182,6 +187,7 @@ def ask():
         return jsonify({"answer": answer})
 
     except Exception as e:
+        print("ASK ERROR:", e)
         return jsonify({"error": str(e)})
 
 
